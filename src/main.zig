@@ -1,10 +1,3 @@
-//notes
-//
-//limit write speed (for pasting into bad devices)
-//resize detection
-//clipping of status bar
-//
-
 const std = @import("std");
 const config = @import("config.zig");
 const zig_serial = @import("serial");

@@ -39,6 +39,36 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
     const log_opt = Arg.singleValueOption("output", 'o', "Log to file");
     try root.addArg(log_opt);
 
+    // extract parity, wordsize, stop and start possibilities from the enums and create cmdline opts
+    var parityNames:[std.meta.fields(zig_serial.Parity).len][]const u8 = undefined;
+    inline for (std.meta.fields(zig_serial.Parity), 0..) |f, i| {
+        parityNames[i] = f.name;
+    }
+    const parity_opt = Arg.singleValueOptionWithValidValues("parity", 'p', "Parity", &parityNames);
+    try root.addArg(parity_opt);
+
+    var wordsizeNames:[std.meta.fields(zig_serial.WordSize).len][]const u8 = undefined;
+    inline for (std.meta.fields(zig_serial.WordSize), 0..) |f, i| {
+        wordsizeNames[i] = f.name;
+    }
+    const wordsize_opt = Arg.singleValueOptionWithValidValues("wordsize", 'w', "wordsize", &wordsizeNames);
+    try root.addArg(wordsize_opt);
+
+    var stopNames:[std.meta.fields(zig_serial.StopBits).len][]const u8 = undefined;
+    inline for (std.meta.fields(zig_serial.StopBits), 0..) |f, i| {
+        stopNames[i] = f.name;
+    }
+    const stop_opt = Arg.singleValueOptionWithValidValues("stop", 's', "stop", &stopNames);
+    try root.addArg(stop_opt);
+
+    var handshakeNames:[std.meta.fields(zig_serial.Handshake).len][]const u8 = undefined;
+    inline for (std.meta.fields(zig_serial.Handshake), 0..) |f, i| {
+        handshakeNames[i] = f.name;
+    }
+    const handshake_opt = Arg.singleValueOptionWithValidValues("flow", 'f', "flow", &handshakeNames);
+    try root.addArg(handshake_opt);
+
+
     try root.addArg(Arg.positional("port", "serial port file", 1));
     try root.addArg(Arg.positional("speed", "baudrate", 2));
 
@@ -58,6 +88,47 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
 
         return null;
     }
+
+    if (matches.containsArg("parity")) {
+        if (matches.getSingleValue("parity")) |s| {
+            if (std.meta.stringToEnum(zig_serial.Parity, s)) |e| {
+                serial_config.parity = e;
+            } else {
+                return null;
+            }
+        }
+    }
+
+    if (matches.containsArg("wordsize")) {
+        if (matches.getSingleValue("wordsize")) |s| {
+            if (std.meta.stringToEnum(zig_serial.WordSize, s)) |e| {
+                serial_config.word_size = e;
+            } else {
+                return null;
+            }
+        }
+    }
+
+    if (matches.containsArg("stop")) {
+        if (matches.getSingleValue("stop")) |s| {
+            if (std.meta.stringToEnum(zig_serial.StopBits, s)) |e| {
+                serial_config.stop_bits = e;
+            } else {
+                return null;
+            }
+        }
+    }
+
+    if (matches.containsArg("flow")) {
+        if (matches.getSingleValue("flow")) |s| {
+            if (std.meta.stringToEnum(zig_serial.Handshake, s)) |e| {
+                serial_config.handshake = e;
+            } else {
+                return null;
+            }
+        }
+    }
+
 
     if (matches.containsArg("speed")) {
         if (matches.getSingleValue("speed")) |speed| {
@@ -95,5 +166,4 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
     }
 
     return null;
-
 }

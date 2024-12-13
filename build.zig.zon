@@ -1,0 +1,25 @@
+.{
+    .name = "commy",
+    .version = "0.0.1",
+
+    .dependencies = .{
+        .serial = .{
+            .url = "git+https://github.com/ringtailsoftware/serial.git?ref=bufprint#65bf6216beac596ff77c25dc21f87dccb412d39a",
+            .hash = "1220e858d023aca7d62470786ed19a8811ff0e42b5328f588cdac3ce544295831c49",
+        },
+        .zvterm = .{
+            .url = "git+https://github.com/ringtailsoftware/zvterm.git#00c26bea76ba3d344ddcf05cb739fbe6bec07015",
+            .hash = "1220fbc7b47f27725cca5ec2784eb1514d8a38b7bad2770d7647e3e79347e54c7875",
+        },
+        .yazap = .{
+            .url = "git+https://github.com/prajwalch/yazap#c2e3122d5dd6192513ba590f229dbc535110efb8",
+            .hash = "122054439ec36ac10987c87ae69f3b041b40b2e451af3fe3ef1fc578b3bad756a800",
+        },
+    },
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}

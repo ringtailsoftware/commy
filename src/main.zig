@@ -137,6 +137,10 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*const config.Config) !void {
             std.debug.print("'{s}' is busy\n", .{conf.portname});
             return;
         },
+        error.AccessDenied => {
+            std.debug.print("Access denied '{s}'\n", .{conf.portname});
+            return;
+        },
         else => return err,
     };
 

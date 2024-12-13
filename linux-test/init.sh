@@ -1,5 +1,4 @@
 #!/bin/bash
 
-socat PTY,link=/dev/ttyS10 PTY,link=/dev/ttyS11 &
-agetty -n -c -a root ttyS10 115200 linux &
-commy /dev/ttyS11 115200
+socat EXEC:"/bin/bash",pty,stderr,setsid,sane PTY,link=/dev/ttyS11,setsid,raw,echo=0 &
+commy /dev/ttyS11 921600

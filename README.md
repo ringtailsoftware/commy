@@ -39,3 +39,25 @@ Enable local echo of sent data, used for devices which do not echo back characte
 
 It tells the user how to quit.
 
+# Help text
+
+    Usage: commy [ARGS] [OPTIONS]
+
+    Args:
+        port                                          serial port file
+        speed                                         baudrate
+
+    Options:
+        -l, --list                                    List available serial ports
+        -e, --echo                                    Enable local echo
+        -o, --output=<output>                         Log to file
+        -p, --parity=<parity>                         Parity
+                                                        values: { none, even, odd, mark, space }
+        -w, --wordsize=<wordsize>                     wordsize
+                                                        values: { five, six, seven, eight }
+        -s, --stop=<stop>                             stop
+                                                        values: { one, two }
+        -f, --flow=<flow>                             flow
+                                                        values: { none, software, hardware }
+        -h, --help                                    Print this help and exit
+

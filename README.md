@@ -61,3 +61,12 @@ It tells the user how to quit.
                                                         values: { none, software, hardware }
         -h, --help                                    Print this help and exit
 
+# Testing
+
+If no serial device is available, commy can connect to a Linux serial terminal inside docker. From here, any standard linux terminal software can be used.
+
+    cd linux-test
+    ./lincommy.sh
+
+This will build commy, then build a docker container and start it. Inside the container `socat` will create a virtual serial port and bind it to `bash`. commy will then connect to the virtual serial port. Quitting commy will close down the docker container.
+

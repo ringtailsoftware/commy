@@ -64,45 +64,62 @@ pub fn raw_mode_stop() void {
 }
 
 fn redraw(portname:[]const u8, comm_desc:[]const u8) !void {
-    try stdout_writer.print(csi ++ "?2026h", .{}); // stop updating
-    try stdout_writer.print(csi ++ "?25l", .{}); // hide cursor
+    var buf = std.io.bufferedWriter(stdout_writer);
+    var writer = buf.writer();
+
+    try writer.print(csi ++ "?2026h", .{}); // stop updating
+    try writer.print(csi ++ "?25l", .{}); // hide cursor
+
+    // avoid changing colours unless we need to
+    var prevFg:?ZVTerm.Cell.RGBACol = null;
+    var prevBg:?ZVTerm.Cell.RGBACol = null;
 
     for (0..term.height) |y| {
-        try stdout_writer.print(csi ++ "{d};{d}H", .{ y + 1 + num_status_lines, 1 });
+        try writer.print(csi ++ "{d};{d}H", .{ y + 1 + num_status_lines, 1 });
         for (0..term.width) |x| {
             const cell = term.getCell(x, y);
             if (cell.char) |ch| {
-                try stdout_writer.print(csi ++ "48;2;{d};{d};{d}m", .{ cell.bg.rgba.r, cell.bg.rgba.g, cell.bg.rgba.b });
-                try stdout_writer.print(csi ++ "38;2;{d};{d};{d}m", .{ cell.fg.rgba.r, cell.fg.rgba.g, cell.fg.rgba.b });
+                if (prevBg == null or prevBg.?.raw != cell.bg.raw) {
+                    try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ cell.bg.rgba.r, cell.bg.rgba.g, cell.bg.rgba.b });
+                    prevBg = cell.bg;
+                }
+                if (prevFg == null or prevFg.?.raw != cell.fg.raw) {
+                    try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ cell.fg.rgba.r, cell.fg.rgba.g, cell.fg.rgba.b });
+                    prevFg = cell.fg;
+                }
 
-                try stdout_writer.print("{c}", .{ch});
+                try writer.print("{c}", .{ch});
             } else {
-                try stdout_writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // bg
-                try stdout_writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
-                try stdout_writer.print("{c}", .{' '});
+                try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // bg
+                try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
+                prevBg = ZVTerm.Cell.RGBACol {.raw=0};
+                prevFg = ZVTerm.Cell.RGBACol {.raw=0};
+                try writer.print("{c}", .{' '});
             }
         }
     }
 
     // status line at the top
-    try stdout_writer.print(csi ++ "{d};{d}H", .{ 1, 1 });
-    try stdout_writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0xFF, 0xFF, 0xFF }); // bg
-    try stdout_writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
-    for (0..term_width) |_| try stdout_writer.print(" ", .{});
+    try writer.print(csi ++ "{d};{d}H", .{ 1, 1 });
+    try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0xFF, 0xFF, 0xFF }); // bg
+    try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
+    for (0..term_width) |_| try writer.print(" ", .{});
     switch(opmode) {
-        .Normal => try stdout_writer.print(csi ++ "{d};{d}HMenu:{{ctrl-a}} {s} {s}", .{ 1, 1, portname, comm_desc }),
-        .Menu => try stdout_writer.print(csi ++ "{d};{d}HBack:{{esc}} Quit:{{q,\\,x}}", .{ 1, 1}),
+        .Normal => try writer.print(csi ++ "{d};{d}HMenu:{{ctrl-a}} {s} {s}", .{ 1, 1, portname, comm_desc }),
+        .Menu => try writer.print(csi ++ "{d};{d}HBack:{{esc}} Quit:{{q,\\,x}}", .{ 1, 1}),
         else => {},
     }
 
     // move cursor
     const cursorPos = term.getCursorPos();
-    try stdout_writer.print(csi ++ "{d};{d}H", .{ cursorPos.y + 1 + num_status_lines, cursorPos.x + 1 });
+    try writer.print(csi ++ "{d};{d}H", .{ cursorPos.y + 1 + num_status_lines, cursorPos.x + 1 });
 
     // show cursor
-    try stdout_writer.print(csi ++ "?25h", .{});
+    try writer.print(csi ++ "?25h", .{});
 
-    try stdout_writer.print(csi ++ "?2026l", .{}); // resume updating
+    try writer.print(csi ++ "?2026l", .{}); // resume updating
+
+    try buf.flush();
 }
 
 pub fn hostcmdtrapper(data:[]const u8) !bool {

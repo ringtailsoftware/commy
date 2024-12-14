@@ -89,7 +89,7 @@ pub fn raw_mode_stop() void {
     _ = stdout_writer.print("\n", .{}) catch 0;
 }
 
-fn redraw(portname:[]const u8, comm_desc:[]const u8) !void {
+fn redraw(conf:*const config.Config) !void {
     const stdout_writer = std.io.getStdOut().writer();
     var buf = std.io.bufferedWriter(stdout_writer);
     var writer = buf.writer();
@@ -132,7 +132,7 @@ fn redraw(portname:[]const u8, comm_desc:[]const u8) !void {
     try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
     for (0..term_width) |_| try writer.print(" ", .{});
     switch(opmode) {
-        .Normal => try writer.print(csi ++ "{d};{d}HMenu:{{ctrl-a}} {s} {s}", .{ 1, 1, portname, comm_desc }),
+        .Normal => try writer.print(csi ++ "{d};{d}HMenu:{{ctrl-a}} {s} {}", .{ 1, 1, conf.portname, conf.serial_config }),
         .Menu => try writer.print(csi ++ "{d};{d}HBack:{{esc}} Quit:{{q,\\,x}}", .{ 1, 1}),
         else => {},
     }
@@ -171,6 +171,37 @@ pub fn hostcmdtrapper(data:[]const u8) !bool {
     return opmode != orig_opmode;   // needs redraw
 }
 
+fn handleKeyboardData(conf:*const config.Config, serial:std.fs.File, data:[]const u8) !void {
+    if (try hostcmdtrapper(data)) {
+        try redraw(conf);
+    }
+
+    switch(opmode) {
+        .Normal => {
+            _ = try serial.writeAll(data);
+            if (conf.local_echo) {
+                _ = try termwriter.writeAll(data);
+                // if logging, store what got typed
+                if (conf.log_file) |log_file| {
+                    _ = try log_file.writeAll(data);
+                }
+            }
+        },
+        else => {},
+    }
+}
+
+fn handleSerialData(conf:*const config.Config, data:[]const u8) !void {
+    _ = try termwriter.writeAll(data);
+    if (term.damage) {
+        term.damage = false;
+        try redraw(conf);
+    }
+    if (conf.log_file) |log_file| {
+        _ = try log_file.writeAll(data);
+    }
+}
+
 pub fn commloop(allocator: std.mem.Allocator, conf:*const config.Config) !void {
     const stdin_reader = std.io.getStdIn();
 
@@ -194,9 +225,6 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*const config.Config) !void {
 
     try zig_serial.configureSerialPort(serial, conf.serial_config);
 
-    var comm_desc_buf:[64]u8 = undefined;
-    const comm_desc = try std.fmt.bufPrint(&comm_desc_buf, "{}", .{conf.serial_config});
-
     try raw_mode_start();
     
     term = try ZVTerm.init(allocator, term_width, term_height - num_status_lines); // leave space for status lines
@@ -204,7 +232,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*const config.Config) !void {
 
     defer if (builtin.target.os.tag != .windows) raw_mode_stop();
 
-    try redraw(conf.portname, comm_desc);
+    try redraw(conf);
 
     if (builtin.target.os.tag == .windows) {
         // https://stackoverflow.com/questions/19955617/win32-read-from-stdin-with-timeout
@@ -278,45 +306,25 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*const config.Config) !void {
                                     }
                                 }
 
-                                if (try hostcmdtrapper(buf[0..count])) {
-                                    try redraw(conf.portname, comm_desc);
-                                }
-
-                                switch(opmode) {
-                                    .Normal => {
-                                        _ = try serial.writeAll(buf[0..count]);
-                                        if (conf.local_echo) {
-                                            _ = try termwriter.writeAll(buf[0..count]);
-                                            // if logging, store what got typed
-                                            if (conf.log_file) |log_file| {
-                                                _ = try log_file.writeAll(buf[0..count]);
-                                            }
-                                        }
-                                    },
-                                    else => {},
-                                }
+                                try handleKeyboardData(conf, serial, buf[0..count]);
                             }
                         }
                     }
-
                 },
                 WSA_WAIT_EVENT_0 + 1 => {   // serial.handle
                     var buf: [4096]u8 = undefined;
                     var count:std.os.windows.DWORD = undefined;
                     
-                    if (c.ReadFile(serial.handle, &buf, 4096, &count, 0) > 0 and count > 0) {
-                        _ = try termwriter.writeAll(buf[0..count]);
-                        if (term.damage) {
-                            term.damage = false;
-                            try redraw(conf.portname, comm_desc);
-                        }
-                        if (conf.log_file) |log_file| {
-                            _ = try log_file.writeAll(buf[0..count]);
+                    const rc = c.ReadFile(serial.handle, &buf, 4096, &count, 0);
+
+                    if (rc > 0) {
+                        if (count > 0) {
+                            try handleSerialData(conf, buf[0..count]);
                         }
                     } else {
-                        //opmode = .Quit;
+                        opmode = .Quit;
+                        continue :outer;
                     }
-
                 },
                 else => {},
             }
@@ -342,14 +350,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*const config.Config) !void {
                     var buf: [4096]u8 = undefined;
                     const count = serial.read(&buf) catch 0;
                     if (count > 0) {
-                        _ = try termwriter.writeAll(buf[0..count]);
-                        if (term.damage) {
-                            term.damage = false;
-                            try redraw(conf.portname, comm_desc);
-                        }
-                        if (conf.log_file) |log_file| {
-                            _ = try log_file.writeAll(buf[0..count]);
-                        }
+                        try handleSerialData(conf, buf[0..count]);
                     } else {
                         opmode = .Quit;
                     }
@@ -359,23 +360,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*const config.Config) !void {
                     var buf: [4096]u8 = undefined;
                     const count = stdin_reader.read(&buf) catch 0;
                     if (count > 0) {
-                        if (try hostcmdtrapper(buf[0..count])) {
-                            try redraw(conf.portname, comm_desc);
-                        }
-
-                        switch(opmode) {
-                            .Normal => {
-                                _ = try serial.writeAll(buf[0..count]);
-                                if (conf.local_echo) {
-                                    _ = try termwriter.writeAll(buf[0..count]);
-                                    // if logging, store what got typed
-                                    if (conf.log_file) |log_file| {
-                                        _ = try log_file.writeAll(buf[0..count]);
-                                    }
-                                }
-                            },
-                            else => {},
-                        }
+                        try handleKeyboardData(conf, serial, buf[0..count]);
                     } else {
                         opmode = .Quit;
                         continue :outer;

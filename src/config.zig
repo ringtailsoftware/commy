@@ -1,6 +1,7 @@
 const std = @import("std");
 const yazap = @import("yazap");
 const zig_serial = @import("serial");
+const build_info = @import("build_info");
 
 pub const Config = struct {
     portname: []u8,
@@ -29,6 +30,9 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
     var root = app.rootCommand();
 
     root.setProperty(.help_on_empty_args);
+
+    const version_opt = Arg.booleanOption("version", 'v', "Version");
+    try root.addArg(version_opt);
 
     const list_opt = Arg.booleanOption("list", 'l', "List available serial ports");
     try root.addArg(list_opt);
@@ -73,6 +77,11 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
     try root.addArg(Arg.positional("speed", "baudrate", 2));
 
     const matches = try app.parseProcess();
+
+    if (matches.containsArg("version")) {
+        std.debug.print("https://github.com/ringtailsoftware/commy/{s}", .{build_info.git_commit});
+        return null;
+    }
 
     if (matches.containsArg("list")) {
         var iterator = try zig_serial.list();

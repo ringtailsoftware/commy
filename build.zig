@@ -12,6 +12,10 @@ pub fn build(b: *std.Build) void {
         .link_libc = true,
     });
 
+    var opt = b.addOptions();
+    opt.addOption([]const u8, "git_commit", b.option([]const u8, "git_commit", "Current git commit") orelse "");
+    exe.root_module.addImport("build_info", opt.createModule());
+
     const yazap = b.dependency("yazap", .{});
     exe.root_module.addImport("yazap", yazap.module("yazap"));
 

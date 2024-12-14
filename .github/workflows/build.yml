@@ -45,31 +45,31 @@ jobs:
 
       - name: Build x86_64-windows
         working-directory: commy
-        run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=x86_64-windows && cp zig-out/bin/commy.exe bin/commy-x86_64-windows.exe
+        run: mkdir -p bin && zig build -Dgit_commit=commit/$(git rev-parse HEAD) -Doptimize=ReleaseSmall -Dtarget=x86_64-windows && cp zig-out/bin/commy.exe bin/commy-x86_64-windows.exe
 
       - name: Build x86_64-macos
         working-directory: commy
-        run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=x86_64-macos && cp zig-out/bin/commy bin/commy-x86_64-macos
+        run: mkdir -p bin && zig build -Dgit_commit=commit/$(git rev-parse HEAD) -Doptimize=ReleaseSmall -Dtarget=x86_64-macos && cp zig-out/bin/commy bin/commy-x86_64-macos
 
       - name: Build x86_64-linux
         working-directory: commy
-        run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=x86_64-linux && cp zig-out/bin/commy bin/commy-x86_64-linux
+        run: mkdir -p bin && zig build -Dgit_commit=commit/$(git rev-parse HEAD) -Doptimize=ReleaseSmall -Dtarget=x86_64-linux && cp zig-out/bin/commy bin/commy-x86_64-linux
 
       - name: Build x86-linux
         working-directory: commy
-        run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=x86-linux && cp zig-out/bin/commy bin/commy-x86-linux
+        run: mkdir -p bin && zig build -Dgit_commit=commit/$(git rev-parse HEAD) -Doptimize=ReleaseSmall -Dtarget=x86-linux && cp zig-out/bin/commy bin/commy-x86-linux
 
       - name: Build aarch64-windows
         working-directory: commy
-        run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=aarch64-windows && cp zig-out/bin/commy.exe bin/commy-aarch64-windows.exe
+        run: mkdir -p bin && zig build -Dgit_commit=commit/$(git rev-parse HEAD) -Doptimize=ReleaseSmall -Dtarget=aarch64-windows && cp zig-out/bin/commy.exe bin/commy-aarch64-windows.exe
 
       - name: Build aarch64-linux
         working-directory: commy
-        run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=aarch64-linux && cp zig-out/bin/commy bin/commy-aarch64-linux
+        run: mkdir -p bin && zig build -Dgit_commit=commit/$(git rev-parse HEAD) -Doptimize=ReleaseSmall -Dtarget=aarch64-linux && cp zig-out/bin/commy bin/commy-aarch64-linux
 
       - name: Build aarch64-macos
         working-directory: commy
-        run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=aarch64-macos && cp zig-out/bin/commy bin/commy-aarch64-macos
+        run: mkdir -p bin && zig build -Dgit_commit=commit/$(git rev-parse HEAD) -Doptimize=ReleaseSmall -Dtarget=aarch64-macos && cp zig-out/bin/commy bin/commy-aarch64-macos
 
       - name: upload
         uses: svenstaro/upload-release-action@v2

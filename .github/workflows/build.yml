@@ -59,10 +59,6 @@ jobs:
         working-directory: commy
         run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=x86-linux && cp zig-out/bin/commy bin/commy-x86-linux
 
-      - name: Build aarch64v8-linux-gnu
-        working-directory: commy
-        run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=aarch64v8-linux-gnu && cp zig-out/bin/commy bin/commy-aarch64v8-linux-gnu
-
       - name: Build aarch64-windows
         working-directory: commy
         run: mkdir -p bin && zig build -Doptimize=ReleaseSmall -Dtarget=aarch64-windows && cp zig-out/bin/commy.exe bin/commy-aarch64-windows.exe

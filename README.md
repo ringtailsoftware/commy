@@ -1,10 +1,10 @@
-# Commy, a barebones serial monitor
+# Commy, a serial monitor
 
-Commy is a small utility used to connect and monitor serial, UART or COM port devices.
-
-Commy runs on Mac, Linux and Windows. Windows support is experimental.
+Commy is a small console utility for comminicating with tty, UART or COM port devices. It runs on Mac, Linux and Windows. Windows support is experimental (bug reports appreciated).
 
 Does (some of) the same things as [tio](https://github.com/tio/tio), [minicom](https://en.wikipedia.org/wiki/Minicom), [screen](https://www.gnu.org/software/screen/), [miniterm.py](https://github.com/pyserial/pyserial/blob/master/serial/tools/miniterm.py), [zcom](https://github.com/ZigEmbeddedGroup/zcom), [PuTTY](https://www.putty.org/), etc.
+
+Commy incorporates a VT220/xterm/ECMA-48 terminal emulator for consistency whether running in [Windows Terminal](https://github.com/microsoft/terminal), [XTerm](https://en.wikipedia.org/wiki/Xterm) or [Terminal.app](https://en.wikipedia.org/wiki/Terminal_(macOS)).
 
 ![Mac, Windows, Linux](https://github.com/ringtailsoftware/commy/actions/workflows/build.yml/badge.svg)
 
@@ -35,17 +35,19 @@ Commy will try to find available ports which match so connecting to `/dev/ttyUSB
 
 The status bar at the top shows keyboard shortcuts. Press `ctrl-a` then `q`, `\` or `x` to quit.
 
-Log data received from a device. Only received data will be logged, unless local echo is enabled.
+Log data received from a device (only received data will be logged, unless local echo is enabled):
 
     commy /dev/cu.usbmodem1124203 115200 -o log.txt
 
-Enable local echo of sent data, used for devices which do not echo back characters they receive.
+Enable local echo of sent data, used for devices which do not echo back characters they receive:
 
     commy /dev/cu.usbmodem1124203 115200 -e
 
 # Why use Commy?
 
-It tells the user how to quit.
+It tells you how to quit.
+
+Commy does what I use GNU `screen` for, but it's better in two important respects. [First, it is slightly smaller; and secondly it has the words "ctrl-a and quit" inscribed in large friendly letters on its cover.](https://en.wikipedia.org/wiki/Towel_Day)
 
 # Help text
 

@@ -48,10 +48,10 @@ jobs:
         run: mkdir -p bin && zig build -Dtarget=x86_64-windows && cp zig-out/bin/commy.exe bin/commy-x86_64-windows.exe
       - name: Build x86_64-linux
         working-directory: commy
-        run: mkdir -p bin && zig build -Dtarget=x86_64-macos && cp zig-out/bin/commy bin/commy-x86_64-macos.exe
+        run: mkdir -p bin && zig build -Dtarget=x86_64-macos && cp zig-out/bin/commy bin/commy-x86_64-macos
       - name: Build x86_64-macos
         working-directory: commy
-        run: mkdir -p bin && zig build -Dtarget=x86_64-linux && cp zig-out/bin/commy bin/commy-x86_64-linux.exe
+        run: mkdir -p bin && zig build -Dtarget=x86_64-linux && cp zig-out/bin/commy bin/commy-x86_64-linux
       - name: Build aarch64-windows
         working-directory: commy
         run: mkdir -p bin && zig build -Dtarget=aarch64-windows && cp zig-out/bin/commy.exe bin/commy-aarch64-windows.exe
@@ -60,7 +60,7 @@ jobs:
         run: mkdir -p bin && zig build -Dtarget=aarch64-linux && cp zig-out/bin/commy bin/commy-aarch64-linux
       - name: Build aarch64-macos
         working-directory: commy
-        run: mkdir -p bin && zig build -Dtarget=aarch64-macos && cp zig-out/bin/commy bin/commy-aarch64-macos.exe
+        run: mkdir -p bin && zig build -Dtarget=aarch64-macos && cp zig-out/bin/commy bin/commy-aarch64-macos
 
       - name: upload
         uses: svenstaro/upload-release-action@v2

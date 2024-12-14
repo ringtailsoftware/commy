@@ -2,9 +2,9 @@ name: CI
 
 on: [push, pull_request]
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Sets permissions of the GITHUB_TOKEN to allow deployment
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 

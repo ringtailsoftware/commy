@@ -76,14 +76,16 @@ pub fn raw_mode_start() !void {
 }
 
 pub fn raw_mode_stop() void {
-    const stdin_reader = std.io.getStdIn();
     const stdout_writer = std.io.getStdOut().writer();
 
     stdout_writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }) catch {}; // bg
     stdout_writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0xFF, 0xFF, 0xFF }) catch {}; // fg
 
-    if (original_termios) |termios| {
-        std.posix.tcsetattr(stdin_reader.handle, .FLUSH, termios) catch {};
+    if (builtin.target.os.tag != .windows) {
+        const stdin_reader = std.io.getStdIn();
+        if (original_termios) |termios| {
+            std.posix.tcsetattr(stdin_reader.handle, .FLUSH, termios) catch {};
+        }
     }
     term.deinit();
     _ = stdout_writer.print("\n", .{}) catch 0;
@@ -257,7 +259,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
     term = try ZVTerm.init(allocator, term_width, term_height - num_status_lines); // leave space for status lines
     termwriter = term.getWriter();
 
-    defer if (builtin.target.os.tag != .windows) raw_mode_stop();
+    defer raw_mode_stop();
 
     try redraw(conf);
 

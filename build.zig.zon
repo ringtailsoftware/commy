@@ -4,8 +4,8 @@
 
     .dependencies = .{
         .serial = .{
-            .url = "git+https://github.com/ringtailsoftware/serial.git#845605299bfab46a2e26f8e349e197c481893471",
-            .hash = "1220ae52197372a1bed76120a6b0e248773ee408653ec2558883217bae3995461bea",
+            .url = "git+https://github.com/ringtailsoftware/serial.git#ddb549398cafd9cedbe96e13e893faa6e8bfa2db",
+            .hash = "12208ec674497841b15fe9b5428f3d47db986149b9e6b0a43470cf7486ce48c22379",
         },
         .zvterm = .{
             .url = "git+https://github.com/ringtailsoftware/zvterm.git#00c26bea76ba3d344ddcf05cb739fbe6bec07015",

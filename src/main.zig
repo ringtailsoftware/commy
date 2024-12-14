@@ -202,12 +202,38 @@ fn handleSerialData(conf:*const config.Config, data:[]const u8) !void {
     }
 }
 
-pub fn commloop(allocator: std.mem.Allocator, conf:*const config.Config) !void {
+// attempt to open given portname, if that fails open the first which matches portname as substring
+// this allows opening of "COM3" when actual portname is "/.//COM3", or "USB0" for "/dev/ttyUSB0"
+pub fn openserialBestMatch(allocator:std.mem.Allocator, conf:*config.Config) !std.fs.File {
+    const serial = std.fs.cwd().openFile(conf.portname, .{ .mode = .read_write }) catch |err| switch (err) {
+        error.FileNotFound => {
+            // scan list of available devices to look for a match
+            var iterator = try zig_serial.list();
+            defer iterator.deinit();
+
+            while (try iterator.next()) |port| {
+                if (std.mem.containsAtLeast(u8, port.file_name, 1, conf.portname)) {
+                    std.debug.print("{s}\n", .{port.file_name});
+                    allocator.free(conf.portname);  // free old
+                    conf.portname = try allocator.dupe(u8, port.file_name); // replace with discovered name
+                    // try to open this one
+                    return std.fs.cwd().openFile(conf.portname, .{ .mode = .read_write });
+                }
+            }
+
+            return err;
+        },
+        else => return err,
+    };
+    return serial;
+}
+
+pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
     const stdin_reader = std.io.getStdIn();
 
-    var serial = std.fs.cwd().openFile(conf.portname, .{ .mode = .read_write }) catch |err| switch (err) {
+    var serial = openserialBestMatch(allocator, conf) catch |err| switch (err) {
         error.FileNotFound => {
-            std.debug.print("'{s}' does not exist\n", .{conf.portname});
+            std.debug.print("'{s}' does not exist (and no match found)\n", .{conf.portname});
             return;
         },
         error.DeviceBusy => {
@@ -219,6 +245,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*const config.Config) !void {
             return;
         },
         else => return err,
+
     };
 
     defer serial.close();

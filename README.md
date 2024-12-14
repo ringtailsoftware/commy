@@ -29,6 +29,10 @@ Connect to a port
 
     commy /dev/cu.usbmodem1124203 115200
 
+Commy will try to find available ports which match so connecting to `/dev/ttyUSB0` can be written as:
+
+    commy USB0 115200
+
 The status bar at the top shows keyboard shortcuts. Press `ctrl-a` then `q`, `\` or `x` to quit.
 
 Log data received from a device. Only received data will be logged, unless local echo is enabled.

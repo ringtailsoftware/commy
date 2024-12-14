@@ -8,6 +8,8 @@ Does (some of) the same things as [tio](https://github.com/tio/tio), [minicom](h
 
 ![Mac, Windows, Linux](https://github.com/ringtailsoftware/commy/actions/workflows/build.yml/badge.svg)
 
+![](demo.gif)
+
 # Build from source
 
     zig build

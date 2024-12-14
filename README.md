@@ -1,6 +1,6 @@
 # Commy, a serial monitor
 
-Commy is a small console utility for comminicating with tty, UART or COM port devices. It runs on Mac, Linux and Windows. Windows support is experimental (bug reports appreciated).
+Commy is a small console utility for communicating with tty, UART or COM port devices. It runs on Mac, Linux and Windows. Windows support is experimental (bug reports appreciated).
 
 Does (some of) the same things as [tio](https://github.com/tio/tio), [minicom](https://en.wikipedia.org/wiki/Minicom), [screen](https://www.gnu.org/software/screen/), [miniterm.py](https://github.com/pyserial/pyserial/blob/master/serial/tools/miniterm.py), [zcom](https://github.com/ZigEmbeddedGroup/zcom), [PuTTY](https://www.putty.org/), etc.
 

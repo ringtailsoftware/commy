@@ -389,7 +389,10 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
                     var buf: [4096]u8 = undefined;
                     const count = stdin_reader.read(&buf) catch 0;
                     if (count > 0) {
-                        try handleKeyboardData(conf, serial, buf[0..count]);
+                        handleKeyboardData(conf, serial, buf[0..count]) catch {
+                            opmode = .Quit;
+                            continue :outer;
+                        };
                     } else {
                         opmode = .Quit;
                         continue :outer;

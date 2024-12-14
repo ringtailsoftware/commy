@@ -50,7 +50,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref }}
-          file: zig-out/bin/commy.exe
+          file: commy/zig-out/bin/commy.exe
           file_glob: true
           asset_name: windows
           overwrite: true

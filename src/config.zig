@@ -79,7 +79,7 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
     const matches = try app.parseProcess();
 
     if (matches.containsArg("version")) {
-        std.debug.print("https://github.com/ringtailsoftware/commy/{s}", .{build_info.git_commit});
+        std.debug.print("https://github.com/ringtailsoftware/commy/{s}\n", .{build_info.git_commit});
         return null;
     }
 

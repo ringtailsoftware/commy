@@ -58,6 +58,7 @@ Commy does what I use GNU `screen` for, but it's better in two important respect
         speed                                         baudrate
 
     Options:
+        -v, --version                                 Version
         -l, --list                                    List available serial ports
         -e, --echo                                    Enable local echo
         -o, --output=<output>                         Log to file

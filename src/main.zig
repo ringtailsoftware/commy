@@ -51,7 +51,7 @@ pub fn raw_mode_start() !void {
 
         var ws: std.posix.winsize = undefined;
         const err = std.posix.system.ioctl(stdin_reader.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&ws));
-        if (std.posix.errno(err) != .SUCCESS) {
+        if (std.posix.errno(err) != .SUCCESS or ws.ws_col == 0 or ws.ws_row == 0) {
             return error.GetTerminalSizeErr;
         }
         term_width = ws.ws_col;

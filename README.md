@@ -12,36 +12,72 @@ Commy incorporates a VT220/xterm/ECMA-48 terminal emulator for consistency wheth
 
 # Build from source
 
-    zig build
+```shell
+zig build
+zig-out/bin/commy -h
+```
 
-    zig-out/bin/commy -h
+The binary is:
+
+```shell
+zig-out/bin/commy
+```
+
+Copy it to a directory in your path for easy access:
+
+```shell
+sudo cp zig-out/bin/commy /usr/local/bin
+```
+
+Or if you prefer, let zig install it in your home directory (assuming `~/.local/bin` is in your `$PATH`):
+
+```shell
+zig build -Doptimize=ReleaseSafe --prefix ~/.local
+```
+
+`commy` is a single statically linked binary. No further runtime files are required.
+You may install it on another system by simply copying the binary. It can be cross compiled using zig's `-Dtarget`
+
+```shell
+zig build -Dtarget=x86_64-windows
+```
 
 # Typical use
 
 List available serial ports
 
-    commy -l
+```shell
+commy -l
 
-    /dev/cu.usbmodem1124101
-    /dev/cu.usbmodem1124203
+/dev/cu.usbmodem1124101
+/dev/cu.usbmodem1124203
+```
 
 Connect to a port
 
-    commy /dev/cu.usbmodem1124203 115200
+```shell
+commy /dev/cu.usbmodem1124203 115200
+```
 
 Commy will try to find available ports which match so connecting to `/dev/ttyUSB0` can be written as:
 
-    commy USB0 115200
+```shell
+commy USB0 115200
+```
 
 The status bar at the top shows keyboard shortcuts. Press `ctrl-a` then `q`, `\` or `x` to quit.
 
 Log data received from a device (only received data will be logged, unless local echo is enabled):
 
-    commy /dev/cu.usbmodem1124203 115200 -o log.txt
+```shell
+commy /dev/cu.usbmodem1124203 115200 -o log.txt
+```
 
 Enable local echo of sent data, used for devices which do not echo back characters they receive:
 
-    commy /dev/cu.usbmodem1124203 115200 -e
+```shell
+commy /dev/cu.usbmodem1124203 115200 -e
+```
 
 # Why use Commy?
 
@@ -76,8 +112,10 @@ Commy does what I use GNU `screen` for, but it's better in two important respect
 
 If no serial device is available, commy can connect to a Linux serial terminal inside docker. From here, any standard linux terminal software can be used.
 
-    cd linux-test
-    ./lincommy.sh
+```shell
+cd linux-test
+./lincommy.sh
+```
 
 This will build commy, then build a docker container and start it. Inside the container `socat` will create a virtual serial port and bind it to `bash`. commy will then connect to the virtual serial port. Quitting commy will close down the docker container.
 

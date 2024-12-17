@@ -3,6 +3,8 @@ const config = @import("config.zig");
 const zig_serial = @import("serial");
 const ZVTerm = @import("zvterm").ZVTerm;
 const builtin = @import("builtin");
+const Scrollback = @import("scrollback.zig").Scrollback;
+const KeyWindow = @import("keywindow.zig").KeyWindow;
 
 const c = @cImport({
     if (builtin.target.os.tag == .windows) {
@@ -24,7 +26,10 @@ var term_width: usize = 80;
 var term_height: usize = 24;
 const num_status_lines = 1;
 const csi = "\x1b[";
-var opmode:OpMode = .Normal;
+var opmode: OpMode = .Normal;
+var scrollback: Scrollback = undefined;
+var curFrame: usize = 0;
+var keywindow = KeyWindow.init();
 
 pub fn raw_mode_start() !void {
     if (builtin.target.os.tag != .windows) {
@@ -57,18 +62,18 @@ pub fn raw_mode_start() !void {
         term_width = ws.ws_col;
         term_height = ws.ws_row;
     } else {
-        var csbi:std.os.windows.CONSOLE_SCREEN_BUFFER_INFO = undefined;
+        var csbi: std.os.windows.CONSOLE_SCREEN_BUFFER_INFO = undefined;
         const stdouth = try std.os.windows.GetStdHandle(std.os.windows.STD_OUTPUT_HANDLE);
         _ = std.os.windows.kernel32.GetConsoleScreenBufferInfo(stdouth, &csbi);
         term_width = @intCast(csbi.srWindow.Right - csbi.srWindow.Left + 1);
         term_height = @intCast(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
 
-        const ENABLE_PROCESSED_INPUT:u16 = 0x0001;
-        const ENABLE_MOUSE_INPUT:u16 = 0x0010;
-        const ENABLE_WINDOW_INPUT:u16 = 0x0008;
+        const ENABLE_PROCESSED_INPUT: u16 = 0x0001;
+        const ENABLE_MOUSE_INPUT: u16 = 0x0010;
+        const ENABLE_WINDOW_INPUT: u16 = 0x0008;
 
         const stdinh = try std.os.windows.GetStdHandle(std.os.windows.STD_INPUT_HANDLE);
-        var oldMode:std.os.windows.DWORD = undefined;
+        var oldMode: std.os.windows.DWORD = undefined;
         _ = std.os.windows.kernel32.GetConsoleMode(stdinh, &oldMode);
         const newMode = oldMode & ~ENABLE_MOUSE_INPUT & ~ENABLE_WINDOW_INPUT & ~ENABLE_PROCESSED_INPUT;
         _ = std.os.windows.kernel32.SetConsoleMode(stdinh, newMode);
@@ -91,7 +96,7 @@ pub fn raw_mode_stop() void {
     _ = stdout_writer.print("\n", .{}) catch 0;
 }
 
-fn redraw(conf:*const config.Config) !void {
+fn redraw(conf: *const config.Config) !void {
     const stdout_writer = std.io.getStdOut().writer();
     var buf = std.io.bufferedWriter(stdout_writer);
     var writer = buf.writer();
@@ -99,49 +104,61 @@ fn redraw(conf:*const config.Config) !void {
     try writer.print(csi ++ "?2026h", .{}); // stop updating
     try writer.print(csi ++ "?25l", .{}); // hide cursor
 
-    // avoid changing colours unless we need to
-    var prevFg:?ZVTerm.Cell.RGBACol = null;
-    var prevBg:?ZVTerm.Cell.RGBACol = null;
-
-    for (0..term.height) |y| {
-        try writer.print(csi ++ "{d};{d}H", .{ y + 1 + num_status_lines, 1 });
-        for (0..term.width) |x| {
-            const cell = term.getCell(x, y);
-            if (cell.char) |ch| {
-                if (prevBg == null or prevBg.?.raw != cell.bg.raw) {
-                    try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ cell.bg.rgba.r, cell.bg.rgba.g, cell.bg.rgba.b });
-                    prevBg = cell.bg;
-                }
-                if (prevFg == null or prevFg.?.raw != cell.fg.raw) {
-                    try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ cell.fg.rgba.r, cell.fg.rgba.g, cell.fg.rgba.b });
-                    prevFg = cell.fg;
-                }
-
-                try writer.print("{c}", .{ch});
-            } else {
-                try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // bg
-                try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
-                prevBg = ZVTerm.Cell.RGBACol {.raw=0};
-                prevFg = ZVTerm.Cell.RGBACol {.raw=0};
-                try writer.print("{c}", .{' '});
-            }
-        }
-    }
-
     // status line at the top
     try writer.print(csi ++ "{d};{d}H", .{ 1, 1 });
     try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0xFF, 0xFF, 0xFF }); // bg
     try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
     for (0..term_width) |_| try writer.print(" ", .{});
-    switch(opmode) {
+    switch (opmode) {
         .Normal => try writer.print(csi ++ "{d};{d}HMenu:{{ctrl-a}} {s} {}", .{ 1, 1, conf.portname, conf.serial_config }),
-        .Menu => try writer.print(csi ++ "{d};{d}HBack:{{esc}} Quit:{{q,\\,x}}", .{ 1, 1}),
+        .Menu => try writer.print(csi ++ "{d};{d}HBack:{{esc-esc}} Move{{up/down}} Quit:{{q,\\,x}}", .{ 1, 1 }),
         else => {},
     }
 
-    // move cursor
-    const cursorPos = term.getCursorPos();
-    try writer.print(csi ++ "{d};{d}H", .{ cursorPos.y + 1 + num_status_lines, cursorPos.x + 1 });
+    // avoid changing colours unless we need to
+    var prevFg: ?ZVTerm.Cell.RGBACol = null;
+    var prevBg: ?ZVTerm.Cell.RGBACol = null;
+
+    if (scrollback.getFrameN(curFrame)) |frame| {
+        for (0..term.height) |y| {
+            try writer.print(csi ++ "{d};{d}H", .{ y + 1 + num_status_lines, 1 });
+            for (0..term.width) |x| {
+                const cell = frame.cells[y * term.width + x];
+                if (cell.char) |ch| {
+                    if (prevBg == null or prevBg.?.raw != cell.bg.raw) {
+                        try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ cell.bg.rgba.r, cell.bg.rgba.g, cell.bg.rgba.b });
+                        prevBg = cell.bg;
+                    }
+                    if (prevFg == null or prevFg.?.raw != cell.fg.raw) {
+                        try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ cell.fg.rgba.r, cell.fg.rgba.g, cell.fg.rgba.b });
+                        prevFg = cell.fg;
+                    }
+
+                    try writer.print("{c}", .{ch});
+                } else {
+                    try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // bg
+                    try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
+                    prevBg = ZVTerm.Cell.RGBACol{ .raw = 0 };
+                    prevFg = ZVTerm.Cell.RGBACol{ .raw = 0 };
+                    try writer.print("{c}", .{' '});
+                }
+            }
+        }
+        // move cursor
+        try writer.print(csi ++ "{d};{d}H", .{ frame.cursorPos.y + 1 + num_status_lines, frame.cursorPos.x + 1 });
+    } else { // blank area
+        for (0..term.height) |y| {
+            try writer.print(csi ++ "{d};{d}H", .{ y + 1 + num_status_lines, 1 });
+            for (0..term.width) |_| {
+                try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // bg
+                try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
+                try writer.print("{c}", .{' '});
+            }
+        }
+        // move cursor
+        const cursorPos = term.getCursorPos();
+        try writer.print(csi ++ "{d};{d}H", .{ cursorPos.y + 1 + num_status_lines, cursorPos.x + 1 });
+    }
 
     // show cursor
     try writer.print(csi ++ "?25h", .{});
@@ -151,53 +168,87 @@ fn redraw(conf:*const config.Config) !void {
     try buf.flush();
 }
 
-pub fn hostcmdtrapper(data:[]const u8) !bool {
+pub fn hostcmdtrapper(conf: *const config.Config, data: []const u8) !bool {
     const orig_opmode = opmode;
     for (data) |ch| {
-        switch(opmode) {
-            .Normal => {    // see if ctrl-a is pressed
-                if (ch == std.ascii.control_code.soh) {
+        keywindow.push(ch);
+
+        switch (opmode) {
+            .Normal => { // see if ctrl-a is pressed
+                if (keywindow.match("\x01")) { // ctrl-a
                     opmode = .Menu;
+                    keywindow.clear();
                 }
             },
             .Menu => {
-                switch(ch) {
-                    'q','\\','x' => opmode = .Quit,
-                    std.ascii.control_code.esc => opmode = .Normal,
-                    else => {},
+                if (keywindow.match("q") or keywindow.match("\\") or keywindow.match("x")) {
+                    opmode = .Quit;
+                } else if (keywindow.match("\x1b[A")) { // up arrow
+                    const n = scrollback.getNumStoredFrames();
+                    if (curFrame < n-1) {
+                        curFrame += 1;
+                        try redraw(conf);
+                    }
+                } else if (keywindow.match("\x1b[5~")) { // page up
+                    const n = scrollback.getNumStoredFrames();
+                    curFrame += 10;
+                    if (curFrame >= n - 1) {
+                        curFrame = n - 1;
+                    }
+                    try redraw(conf);
+                } else if (keywindow.match("\x1b[B")) { // down arrow
+                    if (curFrame > 0) {
+                        curFrame -= 1;
+                        try redraw(conf);
+                    }
+                } else if (keywindow.match("\x1b[6~")) { // page down
+                    if (curFrame > 10) {
+                        curFrame -= 10;
+                    } else {
+                        curFrame = 0;
+                    }
+                    try redraw(conf);
+                } else if (keywindow.match("\x1b\x1b")) {
+                    opmode = .Normal;
+                    keywindow.clear();
+                    curFrame = 0;
                 }
             },
             else => {},
         }
     }
-    return opmode != orig_opmode;   // needs redraw
+    return opmode != orig_opmode; // needs redraw
 }
 
-fn handleKeyboardData(conf:*const config.Config, serial:std.fs.File, data:[]const u8) !void {
-    if (try hostcmdtrapper(data)) {
+fn handleKeyboardData(conf: *const config.Config, serial: std.fs.File, data: []const u8) !void {
+    if (try hostcmdtrapper(conf, data)) {
         try redraw(conf);
-    }
-
-    switch(opmode) {
-        .Normal => {
-            _ = try serial.writeAll(data);
-            if (conf.local_echo) {
-                _ = try termwriter.writeAll(data);
-                // if logging, store what got typed
-                if (conf.log_file) |log_file| {
-                    _ = try log_file.writeAll(data);
+    } else {
+        switch (opmode) {
+            .Normal => {
+                _ = try serial.writeAll(data);
+                if (conf.local_echo) {
+                    _ = try termwriter.writeAll(data);
+                    // if logging, store what got typed
+                    if (conf.log_file) |log_file| {
+                        _ = try log_file.writeAll(data);
+                    }
                 }
-            }
-        },
-        else => {},
+            },
+            else => {},
+        }
     }
 }
 
-fn handleSerialData(conf:*const config.Config, data:[]const u8) !void {
+fn handleSerialData(conf: *const config.Config, data: []const u8) !void {
     _ = try termwriter.writeAll(data);
-    if (term.damage) {
-        term.damage = false;
-        try redraw(conf);
+
+    if (opmode == .Normal) {
+        if (term.damage) {
+            term.damage = false;
+            scrollback.pushTerm(term);
+            try redraw(conf);
+        }
     }
     if (conf.log_file) |log_file| {
         _ = try log_file.writeAll(data);
@@ -206,7 +257,7 @@ fn handleSerialData(conf:*const config.Config, data:[]const u8) !void {
 
 // attempt to open given portname, if that fails open the first which matches portname as substring
 // this allows opening of "COM3" when actual portname is "/.//COM3", or "USB0" for "/dev/ttyUSB0"
-pub fn openserialBestMatch(allocator:std.mem.Allocator, conf:*config.Config) !std.fs.File {
+pub fn openserialBestMatch(allocator: std.mem.Allocator, conf: *config.Config) !std.fs.File {
     const serial = std.fs.cwd().openFile(conf.portname, .{ .mode = .read_write }) catch |err| switch (err) {
         error.FileNotFound => {
             // scan list of available devices to look for a match
@@ -216,7 +267,7 @@ pub fn openserialBestMatch(allocator:std.mem.Allocator, conf:*config.Config) !st
             while (try iterator.next()) |port| {
                 if (std.mem.containsAtLeast(u8, port.file_name, 1, conf.portname)) {
                     std.debug.print("{s}\n", .{port.file_name});
-                    allocator.free(conf.portname);  // free old
+                    allocator.free(conf.portname); // free old
                     conf.portname = try allocator.dupe(u8, port.file_name); // replace with discovered name
                     // try to open this one
                     return std.fs.cwd().openFile(conf.portname, .{ .mode = .read_write });
@@ -230,7 +281,7 @@ pub fn openserialBestMatch(allocator:std.mem.Allocator, conf:*config.Config) !st
     return serial;
 }
 
-pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
+pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
     const stdin_reader = std.io.getStdIn();
 
     var serial = openserialBestMatch(allocator, conf) catch |err| switch (err) {
@@ -247,7 +298,6 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
             return;
         },
         else => return err,
-
     };
 
     defer serial.close();
@@ -255,11 +305,13 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
     try zig_serial.configureSerialPort(serial, conf.serial_config);
 
     try raw_mode_start();
-    
+
     term = try ZVTerm.init(allocator, term_width, term_height - num_status_lines); // leave space for status lines
     termwriter = term.getWriter();
 
     defer raw_mode_stop();
+
+    scrollback = try Scrollback.init(allocator, term.width, term.height, conf.scrollback);
 
     try redraw(conf);
 
@@ -272,14 +324,14 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
         const MAXDWORD = 0xffffffff;
         const stdinh = try std.os.windows.GetStdHandle(std.os.windows.STD_INPUT_HANDLE);
 
-        var commTimeouts:c.COMMTIMEOUTS = undefined;
-        _ = c.GetCommTimeouts (serial.handle, &commTimeouts);
+        var commTimeouts: c.COMMTIMEOUTS = undefined;
+        _ = c.GetCommTimeouts(serial.handle, &commTimeouts);
         commTimeouts.ReadIntervalTimeout = MAXDWORD;
         commTimeouts.ReadTotalTimeoutMultiplier = 0;
         commTimeouts.ReadTotalTimeoutConstant = 1; // blocks for this long
         commTimeouts.WriteTotalTimeoutMultiplier = 0;
         commTimeouts.WriteTotalTimeoutConstant = 0;
-        _ = c.SetCommTimeouts (serial.handle, &commTimeouts);
+        _ = c.SetCommTimeouts(serial.handle, &commTimeouts);
 
         outer: while (opmode != .Quit) {
             const handles = [_]std.os.windows.HANDLE{
@@ -289,9 +341,9 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
             const array = handles[0..handles.len].*;
             const res = std.os.windows.ws2_32.WSAWaitForMultipleEvents(handles.len, &array, 0, 1000, 1);
 
-            switch(res) {
+            switch (res) {
                 WSA_WAIT_TIMEOUT => {},
-                WSA_WAIT_EVENT_0 => {   // stdinh
+                WSA_WAIT_EVENT_0 => { // stdinh
                     var input_records: [4096]c.INPUT_RECORD = undefined;
                     var num_events_read: u32 = 0;
                     const result = c.ReadConsoleInputW(stdinh, &input_records, @intCast(input_records.len), &num_events_read);
@@ -309,12 +361,12 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
                     };
 
                     const keymap = [_]Keymap{
-                        .{ .keycode = 38, .data = "\x1b[A" },   // up
-                        .{ .keycode = 40, .data = "\x1b[B" },  // down
-                        .{ .keycode = 37, .data = "\x1b[D" },   // left
-                        .{ .keycode = 39, .data = "\x1b[C" },  // right
-                    //    .{ .keycode = 33, .data = "\x1b[5~" },  // page up
-                    //    .{ .keycode = 34, .data = "\x1b[6~" }, // page down
+                        .{ .keycode = 38, .data = "\x1b[A" }, // up
+                        .{ .keycode = 40, .data = "\x1b[B" }, // down
+                        .{ .keycode = 37, .data = "\x1b[D" }, // left
+                        .{ .keycode = 39, .data = "\x1b[C" }, // right
+                        //    .{ .keycode = 33, .data = "\x1b[5~" },  // page up
+                        //    .{ .keycode = 34, .data = "\x1b[6~" }, // page down
                     };
 
                     for (input_records[0..num_events_read]) |record| {
@@ -322,8 +374,8 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
                             const keyEvent = record.Event.KeyEvent;
                             if (keyEvent.bKeyDown != 0) {
                                 // std.debug.print("Key down: {d} (code: {})\n", .{ (keyEvent.uChar.AsciiChar), keyEvent.wVirtualKeyCode });
-                                var count:usize = 1;
-                                var buf:[16]u8 = undefined;
+                                var count: usize = 1;
+                                var buf: [16]u8 = undefined;
                                 buf[0] = keyEvent.uChar.AsciiChar;
 
                                 for (keymap) |km| {
@@ -340,10 +392,10 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
                         }
                     }
                 },
-                WSA_WAIT_EVENT_0 + 1 => {   // serial.handle
+                WSA_WAIT_EVENT_0 + 1 => { // serial.handle
                     var buf: [4096]u8 = undefined;
-                    var count:std.os.windows.DWORD = undefined;
-                    
+                    var count: std.os.windows.DWORD = undefined;
+
                     const rc = c.ReadFile(serial.handle, &buf, 4096, &count, 0);
 
                     if (rc > 0) {
@@ -358,7 +410,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf:*config.Config) !void {
                 else => {},
             }
         }
-    } else {    // mac and linux, use poll
+    } else { // mac and linux, use poll
         outer: while (opmode != .Quit) {
             var fds = [_]std.posix.pollfd{
                 .{
@@ -414,4 +466,3 @@ pub fn main() !void {
         try commloop(allocator, cnf);
     }
 }
-

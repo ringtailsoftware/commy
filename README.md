@@ -79,11 +79,19 @@ Enable local echo of sent data, used for devices which do not echo back characte
 commy /dev/cu.usbmodem1124203 115200 -e
 ```
 
+# Scrollback
+
+Commy supports moving back and forwards in terminal history. However, unlike some serial monitors, it stores screen updates rather than lines of incoming text. This means that a terminal UI can be rewound and replayed in time visually. To enter scrollback, press `ctrl-a`, then use up/down/pageup/pagedown to move through terminal history.
+
+To run commy with a longer scrollback history, use a larger `-b <value>`.
+
+![](scrollback.gif)
+
 # Why use Commy?
 
 It tells you how to quit.
 
-Commy does what I use GNU `screen` for, but it's better in two important respects. [First, it is slightly smaller; and secondly it has the words "ctrl-a and quit" inscribed in large friendly letters on its cover.](https://en.wikipedia.org/wiki/Towel_Day)
+Commy does what I use GNU `screen` for, but it's better in two important respects. First, it is slightly smaller; and secondly it has the words "ctrl-a and quit" inscribed in large friendly letters on its cover.
 
 # Help text
 
@@ -106,6 +114,7 @@ Commy does what I use GNU `screen` for, but it's better in two important respect
                                                         values: { one, two }
         -f, --flow=<flow>                             flow
                                                         values: { none, software, hardware }
+        -b, --buffer=<buffer>                         Scrollback buffer size
         -h, --help                                    Print this help and exit
 
 # Testing

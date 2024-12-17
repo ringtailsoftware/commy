@@ -8,13 +8,14 @@ pub const Config = struct {
     serial_config: zig_serial.SerialConfig,
     log_file: ?std.fs.File,
     local_echo: bool,
+    scrollback: usize,
 };
 
 // parse command line and return an allocated Config
 pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
     const App = yazap.App;
     const Arg = yazap.Arg;
-    
+
     // default config
     var serial_config: zig_serial.SerialConfig = .{
         .baud_rate = 115200,
@@ -44,34 +45,36 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
     try root.addArg(log_opt);
 
     // extract parity, wordsize, stop and start possibilities from the enums and create cmdline opts
-    var parityNames:[std.meta.fields(zig_serial.Parity).len][]const u8 = undefined;
+    var parityNames: [std.meta.fields(zig_serial.Parity).len][]const u8 = undefined;
     inline for (std.meta.fields(zig_serial.Parity), 0..) |f, i| {
         parityNames[i] = f.name;
     }
     const parity_opt = Arg.singleValueOptionWithValidValues("parity", 'p', "Parity", &parityNames);
     try root.addArg(parity_opt);
 
-    var wordsizeNames:[std.meta.fields(zig_serial.WordSize).len][]const u8 = undefined;
+    var wordsizeNames: [std.meta.fields(zig_serial.WordSize).len][]const u8 = undefined;
     inline for (std.meta.fields(zig_serial.WordSize), 0..) |f, i| {
         wordsizeNames[i] = f.name;
     }
     const wordsize_opt = Arg.singleValueOptionWithValidValues("wordsize", 'w', "wordsize", &wordsizeNames);
     try root.addArg(wordsize_opt);
 
-    var stopNames:[std.meta.fields(zig_serial.StopBits).len][]const u8 = undefined;
+    var stopNames: [std.meta.fields(zig_serial.StopBits).len][]const u8 = undefined;
     inline for (std.meta.fields(zig_serial.StopBits), 0..) |f, i| {
         stopNames[i] = f.name;
     }
     const stop_opt = Arg.singleValueOptionWithValidValues("stop", 's', "stop", &stopNames);
     try root.addArg(stop_opt);
 
-    var handshakeNames:[std.meta.fields(zig_serial.Handshake).len][]const u8 = undefined;
+    var handshakeNames: [std.meta.fields(zig_serial.Handshake).len][]const u8 = undefined;
     inline for (std.meta.fields(zig_serial.Handshake), 0..) |f, i| {
         handshakeNames[i] = f.name;
     }
     const handshake_opt = Arg.singleValueOptionWithValidValues("flow", 'f', "flow", &handshakeNames);
     try root.addArg(handshake_opt);
 
+    const scrollback_opt = Arg.singleValueOption("buffer", 'b', "Scrollback buffer size");
+    try root.addArg(scrollback_opt);
 
     try root.addArg(Arg.positional("port", "serial port file", 1));
     try root.addArg(Arg.positional("speed", "baudrate", 2));
@@ -138,7 +141,6 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
         }
     }
 
-
     if (matches.containsArg("speed")) {
         if (matches.getSingleValue("speed")) |speed| {
             serial_config.baud_rate = std.fmt.parseInt(u32, speed, 10) catch {
@@ -156,6 +158,7 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
                 .serial_config = serial_config,
                 .log_file = null,
                 .local_echo = false,
+                .scrollback = 100,
             };
 
             // process options which only make sense if we have a port
@@ -163,6 +166,15 @@ pub fn parseCommandLine(allocator: std.mem.Allocator) !?*Config {
                 if (matches.getSingleValue("output")) |outputFilename| {
                     config.log_file = try std.fs.cwd().createFile(outputFilename, .{ .truncate = false });
                     try config.log_file.?.seekFromEnd(0); // append
+                }
+            }
+
+            if (matches.containsArg("buffer")) {
+                if (matches.getSingleValue("buffer")) |buffer| {
+                    config.scrollback = std.fmt.parseInt(u32, buffer, 10) catch {
+                        std.debug.print("Bad length {s}\n", .{buffer});
+                        return null;
+                    };
                 }
             }
 

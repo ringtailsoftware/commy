@@ -56,11 +56,11 @@ pub fn raw_mode_start() !void {
 
         var ws: std.posix.winsize = undefined;
         const err = std.posix.system.ioctl(stdin_reader.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&ws));
-        if (std.posix.errno(err) != .SUCCESS or ws.ws_col == 0 or ws.ws_row == 0) {
+        if (std.posix.errno(err) != .SUCCESS or ws.col == 0 or ws.row == 0) {
             return error.GetTerminalSizeErr;
         }
-        term_width = ws.ws_col;
-        term_height = ws.ws_row;
+        term_width = ws.col;
+        term_height = ws.row;
     } else {
         var csbi: std.os.windows.CONSOLE_SCREEN_BUFFER_INFO = undefined;
         const stdouth = try std.os.windows.GetStdHandle(std.os.windows.STD_OUTPUT_HANDLE);

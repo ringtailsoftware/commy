@@ -110,7 +110,7 @@ fn redraw(conf: *const config.Config) !void {
     try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
     for (0..term_width) |_| try writer.print(" ", .{});
     switch (opmode) {
-        .Normal => try writer.print(csi ++ "{d};{d}HMenu:{{ctrl-a}} {s} {}", .{ 1, 1, conf.portname, conf.serial_config }),
+        .Normal => try writer.print(csi ++ "{d};{d}HMenu:{{ctrl-b}} {s} {}", .{ 1, 1, conf.portname, conf.serial_config }),
         .Menu => try writer.print(csi ++ "{d};{d}HBack:{{esc-esc}} Move{{up/down}} Quit:{{q,\\,x}}", .{ 1, 1 }),
         else => {},
     }
@@ -174,8 +174,8 @@ pub fn hostcmdtrapper(conf: *const config.Config, data: []const u8) !bool {
         keywindow.push(ch);
 
         switch (opmode) {
-            .Normal => { // see if ctrl-a is pressed
-                if (keywindow.match("\x01")) { // ctrl-a
+            .Normal => { // see if ctrl-b is pressed
+                if (keywindow.match("\x02")) { // ctrl-b
                     opmode = .Menu;
                     keywindow.clear();
                 }

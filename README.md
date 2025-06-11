@@ -67,7 +67,7 @@ Commy will try to find available ports which match so connecting to `/dev/ttyUSB
 commy USB0 115200
 ```
 
-The status bar at the top shows keyboard shortcuts. Press `ctrl-a` then `q`, `\` or `x` to quit.
+The status bar at the top shows keyboard shortcuts. Press `ctrl-b` then `q`, `\` or `x` to quit.
 
 Log data received from a device (only received data will be logged, unless local echo is enabled):
 
@@ -83,7 +83,7 @@ commy /dev/cu.usbmodem1124203 115200 -e
 
 # Scrollback
 
-Commy supports moving back and forwards in terminal history. However, unlike some serial monitors, it stores screen updates rather than lines of incoming text. This means that a terminal UI can be rewound and replayed in time visually. To enter scrollback, press `ctrl-a`, then use up/down/pageup/pagedown to move through terminal history.
+Commy supports moving back and forwards in terminal history. However, unlike some serial monitors, it stores screen updates rather than lines of incoming text. This means that a terminal UI can be rewound and replayed in time visually. To enter scrollback, press `ctrl-b`, then use up/down/pageup/pagedown to move through terminal history.
 
 To run commy with a longer scrollback history, use a larger `-b <value>`.
 
@@ -93,7 +93,7 @@ To run commy with a longer scrollback history, use a larger `-b <value>`.
 
 It tells you how to quit.
 
-Commy does what I use GNU `screen` for, but it's better in two important respects. First, it is slightly smaller; and secondly it has the words "ctrl-a and quit" inscribed in large friendly letters on its cover.
+Commy does what I use GNU `screen` for, but it's better in two important respects. First, it is slightly smaller; and secondly it has the words "ctrl-b and quit" inscribed in large friendly letters on its cover.
 
 # Help text
 

@@ -9,8 +9,8 @@
             .hash = "12208ec674497841b15fe9b5428f3d47db986149b9e6b0a43470cf7486ce48c22379",
         },
         .zvterm = .{
-            .url = "git+https://github.com/ringtailsoftware/zvterm.git#00c26bea76ba3d344ddcf05cb739fbe6bec07015",
-            .hash = "1220fbc7b47f27725cca5ec2784eb1514d8a38b7bad2770d7647e3e79347e54c7875",
+            .url = "git+https://github.com/ringtailsoftware/zvterm.git#e80c45cd45296187ab9d740782929eade217110e",
+            .hash = "zvterm-0.0.1-VuAjAxNkAwCMk1DvX8tLeVpCKPepOs-83HpjPIEnhwow",
         },
         .yazap = .{
             .url = "git+https://github.com/prajwalch/yazap/?ref=v0.6.3#71490491b8f1b0741218160b88cf0a87d2a941ce",

@@ -12,7 +12,7 @@ Commy incorporates a VT220/xterm/ECMA-48 terminal emulator for consistency wheth
 
 # Build from source
 
-Use zig 0.14.0
+Use zig 0.15.2
 
 ```shell
 zig build

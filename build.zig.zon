@@ -5,16 +5,16 @@
 
     .dependencies = .{
         .serial = .{
-            .url = "git+https://github.com/ringtailsoftware/serial.git#ddb549398cafd9cedbe96e13e893faa6e8bfa2db",
-            .hash = "12208ec674497841b15fe9b5428f3d47db986149b9e6b0a43470cf7486ce48c22379",
+            .url = "git+https://github.com/ZigEmbeddedGroup/serial.git#fbd7389ff8bbc9fa362aa74081588755b5d028a0",
+            .hash = "serial-0.0.1-PoeRzF60AAAN8Iu0yXTIX-t3DVzsnmN7vWHKM2HA2Zbq",
         },
         .zvterm = .{
-            .url = "git+https://github.com/ringtailsoftware/zvterm.git#e80c45cd45296187ab9d740782929eade217110e",
-            .hash = "zvterm-0.0.1-VuAjAxNkAwCMk1DvX8tLeVpCKPepOs-83HpjPIEnhwow",
+            .url = "git+https://github.com/ringtailsoftware/zvterm.git#05cee2f1d00c7b4cec0eb9f7beef0b48918b748b",
+            .hash = "zvterm-0.0.1-VuAjA4JnAwAqsAyUTtgA60fx5WNSOnnO68VHq2kCdl0s",
         },
         .yazap = .{
-            .url = "git+https://github.com/prajwalch/yazap/?ref=v0.6.3#71490491b8f1b0741218160b88cf0a87d2a941ce",
-            .hash = "yazap-0.6.3-Z1t-EiLlAQCR5mUSOlF1PovnwyPcIUGeV02lAIVMUEOc",
+            .url = "git+https://github.com/prajwalch/yazap#5aad02aed585bd791c2592e1979417428a055ec4",
+            .hash = "yazap-0.6.3-Z1t-EmrzAQA-8vFR-JGpI7vCSpHv5_6z6PAIDq2X4PoH",
         },
     },
 

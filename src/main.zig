@@ -21,7 +21,7 @@ const OpMode = enum {
 };
 
 var term: *ZVTerm = undefined;
-var termwriter: ZVTerm.TermWriter.Writer = undefined;
+var termwriter: *std.io.Writer = undefined;
 var term_width: usize = 80;
 var term_height: usize = 24;
 const num_status_lines = 1;
@@ -30,11 +30,12 @@ var opmode: OpMode = .Normal;
 var scrollback: Scrollback = undefined;
 var curFrame: usize = 0;
 var keywindow = KeyWindow.init();
+var stdinrdbuf:[4096]u8 = undefined;
+var stdin_reader:*std.Io.Reader = undefined;
 
 pub fn raw_mode_start() !void {
     if (builtin.target.os.tag != .windows) {
-        const stdin_reader = std.io.getStdIn();
-        const handle = stdin_reader.handle;
+        const handle = std.fs.File.stdin().handle;
         var termios = try std.posix.tcgetattr(handle);
         original_termios = termios;
 
@@ -55,7 +56,7 @@ pub fn raw_mode_start() !void {
         try std.posix.tcsetattr(handle, .FLUSH, termios);
 
         var ws: std.posix.winsize = undefined;
-        const err = std.posix.system.ioctl(stdin_reader.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&ws));
+        const err = std.posix.system.ioctl(handle, std.posix.T.IOCGWINSZ, @intFromPtr(&ws));
         if (std.posix.errno(err) != .SUCCESS or ws.col == 0 or ws.row == 0) {
             return error.GetTerminalSizeErr;
         }
@@ -81,37 +82,38 @@ pub fn raw_mode_start() !void {
 }
 
 pub fn raw_mode_stop() void {
-    const stdout_writer = std.io.getStdOut().writer();
+    var buf: [512]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    const stdout = &w.interface;
 
-    stdout_writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }) catch {}; // bg
-    stdout_writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0xFF, 0xFF, 0xFF }) catch {}; // fg
+    stdout.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }) catch {}; // bg
+    stdout.print(csi ++ "38;2;{d};{d};{d}m", .{ 0xFF, 0xFF, 0xFF }) catch {}; // fg
 
     if (builtin.target.os.tag != .windows) {
-        const stdin_reader = std.io.getStdIn();
         if (original_termios) |termios| {
-            std.posix.tcsetattr(stdin_reader.handle, .FLUSH, termios) catch {};
+            std.posix.tcsetattr(std.fs.File.stdin().handle, .FLUSH, termios) catch {};
         }
     }
     term.deinit();
-    _ = stdout_writer.print("\n", .{}) catch 0;
+    _ = stdout.print("\n", .{}) catch 0;
 }
 
 fn redraw(conf: *const config.Config) !void {
-    const stdout_writer = std.io.getStdOut().writer();
-    var buf = std.io.bufferedWriter(stdout_writer);
-    var writer = buf.writer();
+    var buf: [512]u8 = undefined;
+    var w = std.fs.File.stdout().writer(&buf);
+    const stdout = &w.interface;
 
-    try writer.print(csi ++ "?2026h", .{}); // stop updating
-    try writer.print(csi ++ "?25l", .{}); // hide cursor
+    try stdout.print(csi ++ "?2026h", .{}); // stop updating
+    try stdout.print(csi ++ "?25l", .{}); // hide cursor
 
     // status line at the top
-    try writer.print(csi ++ "{d};{d}H", .{ 1, 1 });
-    try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0xFF, 0xFF, 0xFF }); // bg
-    try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
-    for (0..term_width) |_| try writer.print(" ", .{});
+    try stdout.print(csi ++ "{d};{d}H", .{ 1, 1 });
+    try stdout.print(csi ++ "48;2;{d};{d};{d}m", .{ 0xFF, 0xFF, 0xFF }); // bg
+    try stdout.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
+    for (0..term_width) |_| try stdout.print(" ", .{});
     switch (opmode) {
-        .Normal => try writer.print(csi ++ "{d};{d}HMenu:{{ctrl-b}} {s} {}", .{ 1, 1, conf.portname, conf.serial_config }),
-        .Menu => try writer.print(csi ++ "{d};{d}HBack:{{esc-esc}} Move{{up/down}} Quit:{{q,\\,x}}", .{ 1, 1 }),
+        .Normal => try stdout.print(csi ++ "{d};{d}HMenu:{{ctrl-b}} {s} {f}", .{ 1, 1, conf.portname, conf.serial_config }),
+        .Menu => try stdout.print(csi ++ "{d};{d}HBack:{{esc-esc}} Move{{up/down}} Quit:{{q,\\,x}}", .{ 1, 1 }),
         else => {},
     }
 
@@ -121,51 +123,51 @@ fn redraw(conf: *const config.Config) !void {
 
     if (scrollback.getFrameN(curFrame)) |frame| {
         for (0..term.height) |y| {
-            try writer.print(csi ++ "{d};{d}H", .{ y + 1 + num_status_lines, 1 });
+            try stdout.print(csi ++ "{d};{d}H", .{ y + 1 + num_status_lines, 1 });
             for (0..term.width) |x| {
                 const cell = frame.cells[y * term.width + x];
                 if (cell.char) |ch| {
                     if (prevBg == null or prevBg.?.raw != cell.bg.raw) {
-                        try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ cell.bg.rgba.r, cell.bg.rgba.g, cell.bg.rgba.b });
+                        try stdout.print(csi ++ "48;2;{d};{d};{d}m", .{ cell.bg.rgba.r, cell.bg.rgba.g, cell.bg.rgba.b });
                         prevBg = cell.bg;
                     }
                     if (prevFg == null or prevFg.?.raw != cell.fg.raw) {
-                        try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ cell.fg.rgba.r, cell.fg.rgba.g, cell.fg.rgba.b });
+                        try stdout.print(csi ++ "38;2;{d};{d};{d}m", .{ cell.fg.rgba.r, cell.fg.rgba.g, cell.fg.rgba.b });
                         prevFg = cell.fg;
                     }
 
-                    try writer.print("{c}", .{ch});
+                    try stdout.print("{c}", .{ch});
                 } else {
-                    try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // bg
-                    try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
+                    try stdout.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // bg
+                    try stdout.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
                     prevBg = ZVTerm.Cell.RGBACol{ .raw = 0 };
                     prevFg = ZVTerm.Cell.RGBACol{ .raw = 0 };
-                    try writer.print("{c}", .{' '});
+                    try stdout.print("{c}", .{' '});
                 }
             }
         }
         // move cursor
-        try writer.print(csi ++ "{d};{d}H", .{ frame.cursorPos.y + 1 + num_status_lines, frame.cursorPos.x + 1 });
+        try stdout.print(csi ++ "{d};{d}H", .{ frame.cursorPos.y + 1 + num_status_lines, frame.cursorPos.x + 1 });
     } else { // blank area
         for (0..term.height) |y| {
-            try writer.print(csi ++ "{d};{d}H", .{ y + 1 + num_status_lines, 1 });
+            try stdout.print(csi ++ "{d};{d}H", .{ y + 1 + num_status_lines, 1 });
             for (0..term.width) |_| {
-                try writer.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // bg
-                try writer.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
-                try writer.print("{c}", .{' '});
+                try stdout.print(csi ++ "48;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // bg
+                try stdout.print(csi ++ "38;2;{d};{d};{d}m", .{ 0x00, 0x00, 0x00 }); // fg
+                try stdout.print("{c}", .{' '});
             }
         }
         // move cursor
         const cursorPos = term.getCursorPos();
-        try writer.print(csi ++ "{d};{d}H", .{ cursorPos.y + 1 + num_status_lines, cursorPos.x + 1 });
+        try stdout.print(csi ++ "{d};{d}H", .{ cursorPos.y + 1 + num_status_lines, cursorPos.x + 1 });
     }
 
     // show cursor
-    try writer.print(csi ++ "?25h", .{});
+    try stdout.print(csi ++ "?25h", .{});
 
-    try writer.print(csi ++ "?2026l", .{}); // resume updating
+    try stdout.print(csi ++ "?2026l", .{}); // resume updating
 
-    try buf.flush();
+    try stdout.flush();
 }
 
 pub fn hostcmdtrapper(conf: *const config.Config, data: []const u8) !bool {
@@ -229,6 +231,7 @@ fn handleKeyboardData(conf: *const config.Config, serial: std.fs.File, data: []c
                 _ = try serial.writeAll(data);
                 if (conf.local_echo) {
                     _ = try termwriter.writeAll(data);
+                    _ = try termwriter.flush();
                     // if logging, store what got typed
                     if (conf.log_file) |log_file| {
                         _ = try log_file.writeAll(data);
@@ -242,6 +245,7 @@ fn handleKeyboardData(conf: *const config.Config, serial: std.fs.File, data: []c
 
 fn handleSerialData(conf: *const config.Config, data: []const u8) !void {
     _ = try termwriter.writeAll(data);
+    _ = try termwriter.flush();
 
     if (opmode == .Normal) {
         if (term.damage) {
@@ -282,8 +286,6 @@ pub fn openserialBestMatch(allocator: std.mem.Allocator, conf: *config.Config) !
 }
 
 pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
-    const stdin_reader = std.io.getStdIn();
-
     var serial = openserialBestMatch(allocator, conf) catch |err| switch (err) {
         error.FileNotFound => {
             std.debug.print("'{s}' does not exist (and no match found)\n", .{conf.portname});
@@ -419,7 +421,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
                     .revents = undefined,
                 },
                 .{
-                    .fd = stdin_reader.handle,
+                    .fd = std.fs.File.stdin().handle,
                     .events = std.posix.POLL.IN,
                     .revents = undefined,
                 },
@@ -430,6 +432,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
                 if (fds[0].revents == std.posix.POLL.IN) {
                     var buf: [4096]u8 = undefined;
                     const count = serial.read(&buf) catch 0;
+
                     if (count > 0) {
                         try handleSerialData(conf, buf[0..count]);
                     } else {
@@ -438,8 +441,8 @@ pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
                 }
                 // stdin read
                 if (fds[1].revents == std.posix.POLL.IN) {
-                    var buf: [4096]u8 = undefined;
-                    const count = stdin_reader.read(&buf) catch 0;
+                    var buf: [1]u8 = undefined;
+                    const count = stdin_reader.readSliceShort(&buf) catch 0;
                     if (count > 0) {
                         handleKeyboardData(conf, serial, buf[0..count]) catch {
                             opmode = .Quit;
@@ -457,6 +460,9 @@ pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
+
+    var r = std.fs.File.stdin().reader(&stdinrdbuf);
+    stdin_reader = &r.interface;
 
     const conf = config.parseCommandLine(allocator) catch {
         return;

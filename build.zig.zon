@@ -13,8 +13,8 @@
             .hash = "zvterm-0.0.1-VuAjA4JnAwAqsAyUTtgA60fx5WNSOnnO68VHq2kCdl0s",
         },
         .yazap = .{
-            .url = "git+https://github.com/prajwalch/yazap#5aad02aed585bd791c2592e1979417428a055ec4",
-            .hash = "yazap-0.6.3-Z1t-EmrzAQA-8vFR-JGpI7vCSpHv5_6z6PAIDq2X4PoH",
+            .url = "git+https://github.com/ringtailsoftware/yazap.git#37b6b4f762b126f1152d04b34fd3d6f7fd4e174d",
+            .hash = "yazap-0.6.3-Z1t-Emb0AQCKoKkKWhi58ITdjRDlX-WNUnuGayIuBhad",
         },
     },
 

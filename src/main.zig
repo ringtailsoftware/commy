@@ -426,7 +426,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
                     .revents = undefined,
                 },
             };
-            const ready = std.posix.poll(&fds, 1000) catch 0;
+            const ready = try std.posix.poll(&fds, 1000);
             if (ready > 0) {
                 // serial read
                 if (fds[0].revents == std.posix.POLL.IN) {

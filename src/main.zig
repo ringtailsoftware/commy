@@ -427,22 +427,29 @@ pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
                 },
             };
             const ready = try std.posix.poll(&fds, 1000);
+
+            if (fds[0].revents != std.posix.POLL.IN and fds[0].revents != 0) {
+                opmode = .Quit;
+                continue :outer;
+            }
+
             if (ready > 0) {
                 // serial read
                 if (fds[0].revents == std.posix.POLL.IN) {
                     var buf: [4096]u8 = undefined;
-                    const count = serial.read(&buf) catch 0;
+                    const count = try serial.read(&buf);
 
                     if (count > 0) {
                         try handleSerialData(conf, buf[0..count]);
                     } else {
                         opmode = .Quit;
+                        continue :outer;
                     }
                 }
                 // stdin read
                 if (fds[1].revents == std.posix.POLL.IN) {
                     var buf: [1]u8 = undefined;
-                    const count = stdin_reader.readSliceShort(&buf) catch 0;
+                    const count = try stdin_reader.readSliceShort(&buf);
                     if (count > 0) {
                         handleKeyboardData(conf, serial, buf[0..count]) catch {
                             opmode = .Quit;
@@ -453,6 +460,10 @@ pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
                         continue :outer;
                     }
                 }
+            }
+            if (ready < 0) {
+                opmode = .Quit;
+                continue :outer;
             }
         }
     }

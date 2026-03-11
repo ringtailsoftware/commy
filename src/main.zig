@@ -50,8 +50,9 @@ pub fn raw_mode_start() !void {
         termios.lflag.IEXTEN = false;
         termios.lflag.ISIG = false;
         termios.cflag.CSIZE = .CS8;
+
         termios.cc[@intFromEnum(std.posix.V.TIME)] = 0;
-        termios.cc[@intFromEnum(std.posix.V.MIN)] = 1;
+        termios.cc[@intFromEnum(std.posix.V.MIN)] = 0;
 
         try std.posix.tcsetattr(handle, .FLUSH, termios);
 
@@ -426,6 +427,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
                     .revents = undefined,
                 },
             };
+
             const ready = try std.posix.poll(&fds, 1000);
 
             if (fds[0].revents != std.posix.POLL.IN and fds[0].revents != 0) {
@@ -448,7 +450,7 @@ pub fn commloop(allocator: std.mem.Allocator, conf: *config.Config) !void {
                 }
                 // stdin read
                 if (fds[1].revents == std.posix.POLL.IN) {
-                    var buf: [1]u8 = undefined;
+                    var buf: [4096]u8 = undefined;
                     const count = try stdin_reader.readSliceShort(&buf);
                     if (count > 0) {
                         handleKeyboardData(conf, serial, buf[0..count]) catch {
